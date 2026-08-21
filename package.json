@@ -1,0 +1,19 @@
+{
+  "name": "video-trimmer-stitcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static, offline-capable web video trimmer & stitcher (ffmpeg.wasm)",
+  "type": "module",
+  "scripts": {
+    "serve": "npx --yes serve -l 8080 .",
+    "test": "node test/exporter.test.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

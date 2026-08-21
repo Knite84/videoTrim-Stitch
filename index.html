@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrimStitch — local video trimmer & stitcher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="toolbar">
+    <span class="logo">✂ TrimStitch</span>
+    <span id="engineStatus" class="engine-status"></span>
+    <span class="sep"></span>
+    <label class="zoom-label">zoom
+      <input type="range" id="zoom" min="6" max="400" step="2" value="60">
+    </label>
+    <span class="sep"></span>
+    <button id="splitBtn" title="split segment at playhead (S)">✂ Split</button>
+    <button id="leftBtn" title="move segment left">◀</button>
+    <button id="rightBtn" title="move segment right">▶</button>
+    <button id="newTrackBtn" title="move segment to its own new track">⇱ new track</button>
+    <button id="delSegBtn" title="delete selected segment (Del)">🗑 Delete</button>
+    <button id="addTrackBtn" title="add empty track">+ track</button>
+    <span class="spacer"></span>
+    <div id="progressWrap" hidden>
+      <div id="progressBar"></div>
+      <span id="progressPct"></span>
+    </div>
+    <button id="exportBtn" class="primary" title="export selected track as mp4">Export ⤓</button>
+  </header>
+
+  <main>
+    <section id="leftPane">
+      <div id="well" aria-label="clip library"></div>
+      <div id="playerBox"></div>
+      <div id="notices"></div>
+    </section>
+    <section id="rightPane">
+      <div id="timeline"></div>
+    </section>
+  </main>
+
+  <footer id="statusbar">
+    <span>everything runs locally in your browser — files never leave your machine</span>
+    <span class="spacer"></span>
+    <span>space play · ←/→ frame · shift+←/→ 10 frames · I/O set trim · S split</span>
+  </footer>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
