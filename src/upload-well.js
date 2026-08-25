@@ -6,6 +6,7 @@ export class UploadWell {
   constructor(container, workspace, hooks = {}) {
     this.container = container;
     this.ws = workspace;
+    this.dropRoot = hooks.dropRoot || container; // whole left column by default
     this.onNotify = hooks.onNotify || (() => {});
     this.onEngineStatus = hooks.onEngineStatus || (() => {});
     this.queue = [];
@@ -20,7 +21,7 @@ export class UploadWell {
     this.dropzone.className = 'dropzone';
     this.dropzone.innerHTML = `
       <span class="dz-icon">⬇</span>
-      <span>Drop clips here or <button class="linkish" id="browseBtn">browse</button></span>
+      <span>Drop clips anywhere in this column, or <button class="linkish">browse</button></span>
       <span class="dz-hint">video files · processed entirely in your browser</span>`;
     this.chips = document.createElement('div');
     this.chips.className = 'chips';
@@ -33,28 +34,30 @@ export class UploadWell {
     input.hidden = true;
     this.fileInput = input;
     this.container.appendChild(input);
-    this.dropzone.addEventListener('click', (e) => {
-      if (e.target === this.dropzone || e.target.classList.contains('linkish')
-        || e.target.classList.contains('dz-icon')) input.click();
-    });
+    this.dropzone.addEventListener('click', () => input.click());
     input.addEventListener('change', () => this.addFiles(input.files));
   }
 
   bindDnD() {
+    const root = this.dropRoot;
     const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
-    for (const evt of ['dragenter', 'dragover']) {
-      this.dropzone.addEventListener(evt, (e) => {
-        stop(e);
-        this.dropzone.classList.add('drag');
-      });
-    }
-    for (const evt of ['dragleave', 'drop']) {
-      this.dropzone.addEventListener(evt, (e) => {
-        stop(e);
-        this.dropzone.classList.remove('drag');
-      });
-    }
-    this.dropzone.addEventListener('drop', (e) => {
+    let depth = 0;
+    root.addEventListener('dragenter', (e) => {
+      stop(e);
+      if (++depth === 1) root.classList.add('dragging');
+    });
+    root.addEventListener('dragover', stop);
+    root.addEventListener('dragleave', (e) => {
+      stop(e);
+      if (--depth <= 0) {
+        depth = 0;
+        root.classList.remove('dragging');
+      }
+    });
+    root.addEventListener('drop', (e) => {
+      depth = 0;
+      root.classList.remove('dragging');
+      stop(e);
       if (e.dataTransfer?.files?.length) this.addFiles(e.dataTransfer.files);
     });
   }

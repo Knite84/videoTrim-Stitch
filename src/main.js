@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 
 // ---------- modules ----------
 const well = new UploadWell($('well'), ws, {
+  dropRoot: $('leftRail'), // accept drops across the entire left column
   onNotify: notify,
   onEngineStatus: setEngineStatus,
 });

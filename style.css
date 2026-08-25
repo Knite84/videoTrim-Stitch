@@ -81,29 +81,62 @@ main {
   display: flex;
   min-height: 0;
 }
-#leftPane {
-  width: 400px;
+#leftRail {
+  width: 280px;
   flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--panel);
   border-right: 1px solid var(--border);
 }
-#rightPane {
+#leftRail.dragging { outline: 2px dashed var(--accent); outline-offset: -4px; }
+#leftRail.dragging .dropzone { border-color: var(--accent); }
+#well {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+}
+#libFooter {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+#libFooter #exportBtn {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 13px;
+}
+#libFooter #progressWrap { width: 100%; }
+.foot-hint { font-size: 10px; color: var(--dim); text-align: center; }
+#centerPane {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
+#rightPane {
+  flex: none;
+  height: clamp(220px, 36vh, 420px);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+#tlToolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
 
 /* ---------- upload well ---------- */
-#well {
-  flex: none;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 10px;
-  background: var(--panel);
-}
 .dropzone {
   border: 2px dashed var(--border);
   border-radius: 8px;
@@ -349,12 +382,6 @@ main { position: relative; }
   border-top-color: #f43f5e;
   pointer-events: all;
   cursor: ew-resize;
-}
-
-.tl-addtrack {
-  flex: none;
-  margin: 8px;
-  align-self: flex-start;
 }
 
 .tl-empty {

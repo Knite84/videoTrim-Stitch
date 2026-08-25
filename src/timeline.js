@@ -19,17 +19,13 @@ export class Timeline {
           <div class="tl-rows"></div>
           <div class="tl-playhead" hidden></div>
         </div>
-      </div>
-      <button class="tl-addtrack" title="add empty track">+ track</button>`;
+      </div>`;
 
     this.scroller = container.querySelector('.tl-scroller');
     this.inner = container.querySelector('.tl-inner');
     this.rulerEl = container.querySelector('.tl-ruler');
     this.rowsEl = container.querySelector('.tl-rows');
     this.playheadEl = container.querySelector('.tl-playhead');
-
-    container.querySelector('.tl-addtrack')
-      .addEventListener('click', () => this.ws.addTrack());
 
     this.thumbs = new Map();   // clipId -> Map(interval -> Map(slotIdx -> dataURL))
     this.thumbBusy = false;

@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "serve": "npx --yes serve -l 8080 .",
-    "test": "node test/exporter.test.mjs"
+    "test": "node test/exporter.test.mjs",
+    "test:e2e": "node tests/e2e.mjs",
+    "test:layout": "node tests/layout-check.mjs",
+    "test:dnd": "node tests/dnd-check.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",
