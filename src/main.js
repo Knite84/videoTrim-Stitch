@@ -19,6 +19,43 @@ const well = new UploadWell($('well'), ws, {
 const player = new PreviewPlayer($('playerBox'), ws);
 const timeline = new Timeline($('timeline'), ws, player);
 
+// ---------- preview/timeline vertical split ----------
+(() => {
+  const split = $('vSplit');
+  const pane = $('rightPane');
+  const center = $('centerPane');
+  const MIN_PANE = 150;      // timeline needs ruler + one row + toolbar
+  const MIN_PREVIEW = 160;
+
+  split.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = pane.getBoundingClientRect().height;
+    document.body.classList.add('resizing');
+
+    const apply = (h) => {
+      const max = Math.max(MIN_PANE,
+        center.clientHeight - MIN_PREVIEW - split.offsetHeight);
+      pane.style.height =
+        `${Math.round(Math.min(Math.max(h, MIN_PANE), max))}px`;
+    };
+
+    // window-level listeners (pointer capture unreliable — see timeline.js)
+    const onMove = (ev) => apply(startH - (ev.clientY - startY));
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('resizing');
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+
+  // double-click resets to the CSS default
+  split.addEventListener('dblclick', () => { pane.style.height = ''; });
+})();
+
 // ---------- toolbar ----------
 $('zoom').addEventListener('input', (e) => {
   ws.setPps(Number(e.target.value));
@@ -39,10 +76,6 @@ $('delSegBtn').addEventListener('click', () => {
 });
 $('leftBtn').addEventListener('click', () => ws.selectedSegId && ws.moveSegment(ws.selectedSegId, -1));
 $('rightBtn').addEventListener('click', () => ws.selectedSegId && ws.moveSegment(ws.selectedSegId, 1));
-$('newTrackBtn').addEventListener('click', () => {
-  if (!ws.selectedSegId) return notify('Select a segment first');
-  ws.moveSegmentToNewTrack(ws.selectedSegId);
-});
 $('addTrackBtn').addEventListener('click', () => ws.addTrack());
 
 // ---------- export ----------

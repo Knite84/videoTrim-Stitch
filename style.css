@@ -124,8 +124,31 @@ main {
   height: clamp(220px, 36vh, 420px);
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border);
 }
+#vSplit {
+  flex: none;
+  height: 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  cursor: row-resize;
+  position: relative;
+}
+#vSplit::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--dim);
+  opacity: .55;
+}
+#vSplit:hover::after,
+body.resizing #vSplit::after { background: var(--accent2); opacity: 1; }
+body.resizing { cursor: row-resize; user-select: none; }
 #tlToolbar {
   flex: none;
   display: flex;
@@ -382,6 +405,35 @@ main { position: relative; }
   border-top-color: #f43f5e;
   pointer-events: all;
   cursor: ew-resize;
+}
+
+/* cross-track drag */
+.tl-ghost {
+  position: fixed;
+  z-index: 100;
+  transform: translate(-50%, -150%);
+  background: rgba(59, 130, 246, .92);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
+.tl-dropmark {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  margin-left: -1px;
+  background: #f43f5e;
+  border-radius: 2px;
+  z-index: 7;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(244, 63, 94, .8);
 }
 
 .tl-empty {

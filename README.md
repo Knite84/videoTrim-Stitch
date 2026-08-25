@@ -31,11 +31,13 @@ special headers (single-threaded wasm avoids the COOP/COEP requirement).
 1. Drop clips into the well (top left). Each upload becomes its own track.
 2. Trim by dragging the edge handles; fine-tune with the preview player's
    frame-step buttons and **Set in / Set out**.
-3. Stitch: click a chip in the well to append it to the last track, or use the
-   ◀ ▶ / new-track toolbar actions to arrange segments. Split at playhead with
-   ✂ / `S`.
+3. Stitch: **drag segments between tracks** (drop past a track's last segment
+   to append at the end), click a chip in the well to append it to the last
+   track, or use the ◀ ▶ toolbar actions. Split at playhead with ✂ / `S`.
 4. Zoom the timeline with Ctrl+scroll or the slider.
-5. **Export** renders the selected track to a single mp4 (H.264 + AAC, crf 18)
+5. Drag the bar between preview and timeline to give portrait clips more
+   height (double-click the bar to reset).
+6. **Export** renders the selected track to a single mp4 (H.264 + AAC, crf 18)
    and auto-downloads it. The export *is* the preview render — what you see is
    what you get.
 

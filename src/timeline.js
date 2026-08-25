@@ -149,6 +149,10 @@ export class Timeline {
       block.appendChild(h);
     }
 
+    block.addEventListener('dragstart', (e) => e.preventDefault());
+    block.addEventListener('pointerdown', (e) =>
+      this.startMoveDrag(e, segment, block, pps));
+
     block.addEventListener('click', () => {
       this.ws.select(segment.id);
       this.player.bind(segment.id);
@@ -218,8 +222,8 @@ export class Timeline {
     const startX = evt.clientX;
     const startIn = segment.inPoint;
     const startOut = segment.outPoint;
-    block.setPointerCapture(evt.pointerId);
 
+    // window-level listeners (pointer capture unreliable — see startMoveDrag)
     const onMove = (e) => {
       const dt = (e.clientX - startX) / pps;
       if (side === 'l') {
@@ -236,15 +240,15 @@ export class Timeline {
       this.updatePlayhead(this.player.video.currentTime);
     };
     const onUp = () => {
-      block.removeEventListener('pointermove', onMove);
-      block.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
       this.draggingHandle = false;
       this.ws.setTrim(segment.id, segment.inPoint, segment.outPoint); // commit + emit
       this.player.range = { in: segment.inPoint, out: segment.outPoint };
       this.player.updateTimecode();
     };
-    block.addEventListener('pointermove', onMove);
-    block.addEventListener('pointerup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   }
 
   previewEdge(segment, edgeTime) {
@@ -253,6 +257,94 @@ export class Timeline {
       this.player.range = { in: segment.inPoint, out: segment.outPoint };
       this.player.seekToSource(edgeTime);
     }
+  }
+
+  // ---------- cross-track segment dragging ----------
+
+  startMoveDrag(evt, segment, block, pps) {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    const startX = evt.clientX;
+    const startY = evt.clientY;
+    const clip = this.ws.getClip(segment.clipId);
+    const dur = Math.max(0, segment.outPoint - segment.inPoint);
+
+    let active = false;
+    let ghost = null;
+    let mark = null;
+    let pending = null; // { trackId, index }
+
+    // NOTE: window-level listeners — pointer capture proved unreliable
+    // (Chromium reports hasPointerCapture but keeps hit-test targeting).
+    const begin = () => {
+      active = true;
+      ghost = document.createElement('div');
+      ghost.className = 'tl-ghost';
+      ghost.textContent = `${clip?.name || '?'} · ${dur.toFixed(1)}s`;
+      ghost.style.width = `${Math.max(48, Math.min(240, dur * pps))}px`;
+      document.body.appendChild(ghost);
+      mark = document.createElement('div');
+      mark.className = 'tl-dropmark';
+    };
+
+    const onMove = (e) => {
+      if (!active) {
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) < 6) return;
+        begin();
+      }
+      ghost.style.left = `${e.clientX}px`;
+      ghost.style.top = `${e.clientY}px`;
+
+      const row = this.rowAtY(e.clientY);
+      if (!row) {
+        pending = null;
+        mark.remove();
+        return;
+      }
+      const gT = Math.max(0, this.timeAtClientX(e.clientX));
+      const slot = nearestSlot(this.ws.pps, row.track, gT);
+      pending = { trackId: row.track.id, index: slot.index };
+      if (mark.parentElement !== row.laneEl) {
+        mark.remove();
+        row.laneEl.appendChild(mark);
+      }
+      mark.style.left = `${slot.xPx.toFixed(1)}px`;
+    };
+
+    const finish = (commit) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      ghost?.remove();
+      mark?.remove();
+      if (commit && pending) {
+        this.ws.moveSegmentTo(segment.id, pending.trackId, pending.index);
+        this.ws.select(segment.id);
+        this.player.bind(segment.id);
+      }
+      this.rebuild();
+    };
+    const onUp = () => finish(true);
+    const onCancel = () => finish(false);
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+  }
+
+  // which timeline row is under this clientY?
+  rowAtY(clientY) {
+    for (const rowEl of this.rowsEl.children) {
+      if (!rowEl.classList.contains('tl-row')) continue;
+      const r = rowEl.getBoundingClientRect();
+      if (clientY >= r.top && clientY < r.bottom) {
+        const laneEl = rowEl.querySelector('.tl-lane');
+        const trackId = laneEl?.dataset.trackId;
+        const track = this.ws.tracks.find((t) => t.id === trackId);
+        if (track && laneEl) return { track, laneEl };
+      }
+    }
+    return null;
   }
 
   rowOffsetOf(segId) {
@@ -370,6 +462,23 @@ function pickThumbInterval(pps) {
     if (k * pps >= 44) return k;
   }
   return 2;
+}
+
+// insertion slot whose boundary (in output time) is nearest to gT
+function nearestSlot(pps, track, gT) {
+  const bounds = [0];
+  let cum = 0;
+  for (const s of track.segments) {
+    cum += Math.max(0, s.outPoint - s.inPoint);
+    bounds.push(cum);
+  }
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < bounds.length; i++) {
+    const d = Math.abs(gT - bounds[i]);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return { index: best, xPx: bounds[best] * pps };
 }
 
 // extract an average color from a thumbnail dataURL for block edge tint

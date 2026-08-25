@@ -9,7 +9,8 @@
     "test": "node test/exporter.test.mjs",
     "test:e2e": "node tests/e2e.mjs",
     "test:layout": "node tests/layout-check.mjs",
-    "test:dnd": "node tests/dnd-check.mjs"
+    "test:dnd": "node tests/dnd-check.mjs",
+    "test:drag": "node tests/drag-check.mjs"
   },
   "dependencies": {
     "@ffmpeg/core": "^0.12.6",

@@ -140,16 +140,25 @@ export class Workspace extends EventTarget {
     this.emit();
   }
 
-  moveSegmentToNewTrack(segId) {
+  // Move a segment into an arbitrary position of an arbitrary track.
+  // `index` is an insertion slot in the TARGET track (0..segments.length);
+  // appending to the end is index = target.segments.length.
+  moveSegmentTo(segId, targetTrackId, index) {
     const hit = this.seg(segId);
-    if (!hit || hit.track.segments.length < 2) return;
-    const [seg] = hit.track.segments.splice(hit.index, 1);
-    this.tracks.push({
-      id: uid('track'),
-      name: `Track ${this.tracks.length + 1}`,
-      segments: [seg],
-    });
+    if (!hit) return false;
+    const target = this.tracks.find((t) => t.id === targetTrackId);
+    if (!target) return false;
+    const { track, segment, index: oldIdx } = hit;
+    let idx = Math.max(0, Math.min(index ?? target.segments.length,
+      target.segments.length));
+    if (track === target) {
+      if (idx === oldIdx || idx === oldIdx + 1) return true; // no-op
+      if (idx > oldIdx) idx--; // removal shifts later slots left
+    }
+    track.segments.splice(oldIdx, 1);
+    target.segments.splice(idx, 0, segment);
     this.emit();
+    return true;
   }
 
   // ---- tracks ----
