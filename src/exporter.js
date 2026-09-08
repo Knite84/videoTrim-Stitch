@@ -19,16 +19,24 @@ export async function exportSegments(segments, { onProgress } = {}) {
     await ffmpeg.deleteFile('out.mp4');
   } catch { /* first run */ }
 
+  let stderrTail = '';
   const onProg = (evt) => {
     // evt.time is output media time in microseconds
     const t = Number(evt?.time || 0) / 1e6;
     const pct = total > 0 ? Math.min(0.999, t / total) : 0;
     onProgress?.(pct, performance.now() - started);
   };
-  const res = await runFFmpeg(job.args, { onProgress: onProg });
+  const res = await runFFmpeg(job.args, {
+    onLog: (msg) => {
+      stderrTail = (stderrTail + '\n' + msg).split('\n').slice(-15).join('\n');
+    },
+    onProgress: onProg,
+  });
 
   if (res.code !== 0) {
-    throw new Error(`ffmpeg exited with code ${res.code}`);
+    throw new Error(
+      `ffmpeg exited with code ${res.code}\n${stderrTail}`
+    );
   }
   const data = await ffmpeg.readFile('out.mp4');
   if (!data || !data.length) throw new Error('ffmpeg produced no output');

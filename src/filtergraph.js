@@ -91,15 +91,16 @@ export function buildExportJob(segments) {
     audioLabels.push(`[a${i}]`);
   });
 
-  const filterComplex = [];
-  if (anyAudio) {
-    filterComplex.push(
-      `${videoLabels.join('')}${audioLabels.join('')}concat=n=${N}:v=1:a=1[vout][aout]`
-    );
-  } else {
-    filterComplex.push(`${videoLabels.join('')}concat=n=${N}:v=1:a=0[vout]`);
-  }
-  filterComplex.push(...chains);
+  // concat with v=1:a=1 expects per-segment pairs interleaved:
+  // [v0][a0][v1][a1]… — grouping all video labels then all audio labels
+  // wires audio into concat's video pads and fails filter graph init.
+  const pairedLabels = videoLabels.flatMap((v, i) => [v, audioLabels[i]]);
+  const filterComplex = [...chains];
+  filterComplex.push(
+    anyAudio
+      ? `${pairedLabels.join('')}concat=n=${N}:v=1:a=1[vout][aout]`
+      : `${videoLabels.join('')}concat=n=${N}:v=1:a=0[vout]`
+  );
 
   const args = [
     '-hide_banner',

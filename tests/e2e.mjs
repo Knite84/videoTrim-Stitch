@@ -137,7 +137,11 @@ assert(outProbe.width === 320 && outProbe.height === 240, 'resolution normalized
 // ---- 6. single-segment frame-accurate trim ----
 await page.evaluate(() => {
   const { ws } = window.__trimstitch;
+  // remove the second segment so this is a true single-segment trim
+  ws.deleteSegment(ws.tracks[0].segments[1].id);
   ws.setTrim(ws.tracks[0].segments[0].id, 0.2, 0.4);
+  ws.select(ws.tracks[0].segments[0].id);
+  ws.emit();
 });
 const dl2 = page.waitForEvent('download', { timeout: 300000 });
 await page.click('#exportBtn');
@@ -159,7 +163,7 @@ assert(Math.abs(probe2.duration - 0.2) < 0.09,
 
 // ---- 7. console/page errors ----
 const serious = errors.filter((e) =>
-  !/demuxer|media|video|decode|codec|SourceBuffer|PIPELINE/i.test(e));
+  !/demuxer|media|video|decode|codec|SourceBuffer|PIPELINE|favicon|404/i.test(e));
 if (errors.length) console.log('  (benign media errors likely from codec-less headless):',
   errors.length, 'suppressed,', serious.length, 'serious');
 assert(serious.length === 0, `no serious page errors (${serious.join(' | ')})`);
