@@ -3,7 +3,7 @@ import { Workspace } from './workspace.js';
 import { UploadWell } from './upload-well.js';
 import { PreviewPlayer } from './preview-player.js';
 import { Timeline } from './timeline.js';
-import { exportSegments } from './exporter.js';
+import { exportSegments, exportFrame } from './exporter.js';
 import { getFFmpeg, isFFmpegLoaded } from './ffmpeg-loader.js';
 
 const ws = new Workspace();
@@ -80,6 +80,36 @@ $('addTrackBtn').addEventListener('click', () => ws.addTrack());
 
 // ---------- export ----------
 let exporting = false;
+$('exportFrameBtn').addEventListener('click', async (e) => {
+  if (player.previewOverride || !player.boundSegId) {
+    return notify('Select a segment first', true);
+  }
+  if (player.playing) player.pause(); // export the frame on screen
+
+  player.refreshFromStore();
+  const seg = player.seg()?.segment;
+  const clip = player.boundSegId && seg ? ws.getClip(seg.clipId) : null;
+  if (!seg || !clip?.probe) return notify('Select a segment first', true);
+
+  const format = e.shiftKey ? 'jpg' : 'webp';
+  const t = Math.min(Math.max(player.video.currentTime, seg.inPoint), seg.outPoint);
+  showProgress(0);
+  try {
+    const result = await exportFrame(clip, t, { format });
+    const ext = format === 'jpg' ? 'jpg' : 'webp';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(result.blob);
+    a.download = `frame-${t.toFixed(6).replace('.', '_')}-${Date.now()}.${ext}`;
+    a.click();
+    notify(`Frame @ ${fmtTime(t)}s exported (${(result.bytes / 1024).toFixed(1)} KB, ${ext})`);
+  } catch (err) {
+    console.error(err);
+    notify(`Frame export failed: ${err.message}`, true);
+  } finally {
+    setTimeout(hideProgress, 800);
+  }
+});
+
 $('exportBtn').addEventListener('click', async () => {
   if (exporting) return;
   const hit = ws.selection();
@@ -161,8 +191,12 @@ function setEngineStatus(status) {
   }
 }
 
-function notify(msg, isError = false) {
-  const box = $('notices');
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  return `${m}:${(s - m * 60).toFixed(3).padStart(6, '0')}`;
+}
+
+function notify(msg, isError = false) {  const box = $('notices');
   const div = document.createElement('div');
   div.className = `notice${isError ? ' err' : ''}`;
   div.textContent = msg;

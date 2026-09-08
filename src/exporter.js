@@ -57,3 +57,42 @@ export async function exportSegments(segments, { onProgress } = {}) {
     args: job.args,
   };
 }
+
+// Extract a single frame from a source clip at timeSec.
+// format: 'webp' (default, via libwebp) or 'jpg' (mjpeg).
+export async function exportFrame(clip, timeSec, { format = 'webp' } = {}) {
+  if (!clip?.file) throw new Error('no clip selected');
+  const t = Number(timeSec);
+  if (!Number.isFinite(t) || t < 0) throw new Error('invalid playhead time');
+
+  const ffmpeg = await getFFmpeg();
+  const m = /\.([a-z0-9]{1,5})$/i.exec(clip.file?.name || '');
+  const inName = `frame-src.${(m?.[1] || 'mp4').toLowerCase()}`;
+  const outName = `frame-out.${format === 'jpg' ? 'jpg' : 'webp'}`;
+
+  await ffmpeg.writeFile(inName, new Uint8Array(await clip.file.arrayBuffer()));
+  let stderrTail = '';
+  const res = await runFFmpeg([
+    '-hide_banner',
+    '-ss', String(Number(t.toFixed(6))),
+    '-i', inName,
+    '-frames:v', '1',
+    '-an',
+    ...(format === 'jpg' ? ['-q:v', '2'] : ['-q:v', '80']),
+    outName,
+  ], {
+    onLog: (msg) => {
+      stderrTail = (stderrTail + '\n' + msg).split('\n').slice(-15).join('\n');
+    },
+  });
+  try { await ffmpeg.deleteFile(inName); } catch { /* ignore */ }
+  if (res.code !== 0) {
+    throw new Error(`frame export failed (ffmpeg code ${res.code})\n${stderrTail}`);
+  }
+  const data = await ffmpeg.readFile(outName);
+  if (!data || !data.length) throw new Error('frame export produced no output');
+  try { await ffmpeg.deleteFile(outName); } catch { /* ignore */ }
+
+  const mime = format === 'jpg' ? 'image/jpeg' : 'image/webp';
+  return { blob: new Blob([data], { type: mime }), bytes: data.length, timeSec: t };
+}

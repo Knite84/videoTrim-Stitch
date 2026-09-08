@@ -21,8 +21,11 @@
           <div id="progressBar"></div>
           <span id="progressPct"></span>
         </div>
-        <button id="exportBtn" class="primary" title="export selected track as mp4">Export ⤓ mp4</button>
-        <span class="foot-hint">renders the selected track · H.264 + AAC · crf 18</span>
+        <div class="export-row">
+          <button id="exportFrameBtn" title="export the paused preview frame as webp · shift-click for .jpg">⤓ frame</button>
+          <button id="exportBtn" class="primary" title="export selected track as mp4">Export ⤓ mp4</button>
+        </div>
+        <span class="foot-hint">frame: paused preview frame (webp) · track: H.264 + AAC · crf 18</span>
       </div>
     </aside>
     <section id="centerPane">

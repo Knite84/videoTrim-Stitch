@@ -106,11 +106,17 @@ main {
   padding: 10px;
   border-top: 1px solid var(--border);
 }
-#libFooter #exportBtn {
-  width: 100%;
+#libFooter .export-row {
+  display: flex;
+  gap: 8px;
+}
+#libFooter .export-row button {
   padding: 9px 10px;
   font-size: 13px;
+  white-space: nowrap;
 }
+#libFooter .export-row #exportBtn { flex: 1; }
+#libFooter .export-row #exportFrameBtn { flex: 0.6; }
 #libFooter #progressWrap { width: 100%; }
 .foot-hint { font-size: 10px; color: var(--dim); text-align: center; }
 #centerPane {
