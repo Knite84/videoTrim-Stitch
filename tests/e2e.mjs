@@ -147,8 +147,7 @@ const dl2 = page.waitForEvent('download', { timeout: 300000 });
 await page.click('#exportBtn');
 const download2 = await dl2;
 const out2 = readFileSync(await download2.path());
-const probe2 = await page.evaluate(async (bytes) => {
-  const { getFFmpeg, runFFmpeg } = await import('/src/ffmpeg-loader.js');
+const probe2 = await page.evaluate(async (bytes) => {  const { getFFmpeg, runFFmpeg } = await import('/src/ffmpeg-loader.js');
   const { parseProbe } = await import('/src/filtergraph.js');
   const ff = await getFFmpeg();
   await ff.writeFile('check-trim.mp4', new Uint8Array(bytes));
@@ -160,6 +159,66 @@ assert(/trimmed-\d+\.mp4$/.test(download2.suggestedFilename()),
   `download name: ${download2.suggestedFilename()}`);
 assert(Math.abs(probe2.duration - 0.2) < 0.09,
   `trimmed duration ~0.20s within one frame @15fps (got ${probe2.duration})`);
+
+// ---- 6b. audio tracks: audio-only export (m4a) ----
+await page.evaluate(() => {
+  const { ws } = window.__trimstitch;
+  ws.addTrack('audio');
+  const t = ws.tracks.find((tr) => tr.kind === 'audio');
+  t.segments.push({
+    id: 'seg_e2e_audio', clipId: ws.clips[0].id,
+    inPoint: 0.2, outPoint: 1.0, muted: false,
+  });
+  ws.select('seg_e2e_audio');
+  ws.emit();
+});
+assert(await page.evaluate(() => window.__trimstitch.ws.tracks.some(
+  (tr) => tr.kind === 'audio')), 'audio track registered as kind audio');
+const dlAudio = page.waitForEvent('download', { timeout: 300000 });
+await page.click('#exportBtn');
+const download3 = await dlAudio;
+assert(/trimmed-\d+\.m4a$/.test(download3.suggestedFilename()),
+  `audio download name: ${download3.suggestedFilename()}`);
+const out3 = readFileSync(await download3.path());
+const probe3 = await page.evaluate(async (bytes) => {
+  const { getFFmpeg, runFFmpeg } = await import('/src/ffmpeg-loader.js');
+  const { parseProbe } = await import('/src/filtergraph.js');
+  const ff = await getFFmpeg();
+  await ff.writeFile('check-audio.m4a', new Uint8Array(bytes));
+  const res = await runFFmpeg(['-hide_banner', '-i', 'check-audio.m4a']);
+  return parseProbe(res.logs);
+}, Array.from(out3));
+console.log('  audio probe:', JSON.stringify(probe3));
+assert(probe3.hasAudio && !probe3.width,
+  `audio-only output (hasAudio ${probe3.hasAudio}, w ${probe3.width})`);
+assert(Math.abs(probe3.duration - 0.8) < 0.15,
+  `audio export duration ~0.80s (got ${probe3.duration})`);
+
+// ---- 6c. muted video segment -> silent-video mp4 ----
+await page.evaluate(() => {
+  const { ws } = window.__trimstitch;
+  ws.select(ws.tracks[0].segments[0].id);
+  ws.toggleMute(ws.tracks[0].segments[0].id);
+  ws.emit();
+});
+const muteArmed = await page.evaluate(() => window.__trimstitch.ws.tracks[0].segments[0].muted);
+assert(muteArmed, 'segment flagged muted');
+const dl4 = page.waitForEvent('download', { timeout: 300000 });
+await page.click('#exportBtn');
+const download4 = await dl4;
+const out4 = readFileSync(await download4.path());
+const probe4 = await page.evaluate(async (bytes) => {
+  const { getFFmpeg, runFFmpeg } = await import('/src/ffmpeg-loader.js');
+  const { parseProbe } = await import('/src/filtergraph.js');
+  const ff = await getFFmpeg();
+  await ff.writeFile('check-muted.mp4', new Uint8Array(bytes));
+  const res = await runFFmpeg(['-hide_banner', '-i', 'check-muted.mp4']);
+  return parseProbe(res.logs);
+}, Array.from(out4));
+console.log('  muted probe:', JSON.stringify(probe4));
+assert(probe4.codec === 'h264', 'muted export still video');
+assert(!probe4.hasAudio, `muted export has no audio (got ${probe4.hasAudio})`);assert(/trimmed-\d+\.mp4$/.test(download4.suggestedFilename()),
+  `muted download name: ${download4.suggestedFilename()}`);
 
 // ---- 7. console/page errors ----
 const serious = errors.filter((e) =>

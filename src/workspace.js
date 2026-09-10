@@ -11,7 +11,7 @@ export class Workspace extends EventTarget {
   constructor() {
     super();
     this.clips = [];      // {id,name,file,objectUrl,thumb,probe:{duration,width,height,fps,codec,hasAudio},warnHevc}
-    this.tracks = [];     // {id,name,segments:[{id,clipId,inPoint,outPoint}]}
+    this.tracks = [];     // {id,name,kind:'video'|'audio',segments:[{id,clipId,inPoint,outPoint,muted}]}
     this.selectedSegId = null;
     this.pps = 60;        // pixels per second (zoom)
   }
@@ -34,8 +34,9 @@ export class Workspace extends EventTarget {
       const dur = clip.probe?.duration ?? 0;
       this.tracks.push({
         id: uid('track'),
+        kind: 'video',
         name: `Track ${this.tracks.length + 1}`,
-        segments: [{ id: uid('seg'), clipId: clip.id, inPoint: 0, outPoint: dur }],
+        segments: [{ id: uid('seg'), clipId: clip.id, inPoint: 0, outPoint: dur, muted: false }],
       });
       const track = this.tracks[this.tracks.length - 1];
       this.selectedSegId = track.segments[0].id;
@@ -162,12 +163,21 @@ export class Workspace extends EventTarget {
   }
 
   // ---- tracks ----
-  addTrack() {
+  addTrack(kind = 'video') {
+    const n = this.tracks.filter((t) => t.kind === kind).length + 1;
     this.tracks.push({
       id: uid('track'),
-      name: `Track ${this.tracks.length + 1}`,
+      kind,
+      name: kind === 'audio' ? `Audio ${n}` : `Track ${this.tracks.length + 1}`,
       segments: [],
     });
+    this.emit();
+  }
+
+  toggleMute(segId) {
+    const hit = this.seg(segId);
+    if (!hit) return;
+    hit.segment.muted = !hit.segment.muted;
     this.emit();
   }
 

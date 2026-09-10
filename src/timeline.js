@@ -92,10 +92,10 @@ export class Timeline {
     row.style.height = `${ROW_H}px`;
 
     const label = document.createElement('div');
-    label.className = 'tl-label';
+    label.className = `tl-label${track.kind === 'audio' ? ' audio' : ''}`;
     const dur = this.ws.trackDuration(track);
     label.innerHTML = `
-      <span class="tl-trackname">${track.name}</span>
+      <span class="tl-trackname">${track.kind === 'audio' ? '♪ ' : '⧉ '}${track.name}</span>
       <span class="tl-trackdur">${dur.toFixed(1)}s</span>
       <button class="tl-deltrack" title="delete track">×</button>`;
     label.querySelector('.tl-deltrack').addEventListener('click',
@@ -103,9 +103,10 @@ export class Timeline {
     row.appendChild(label);
 
     const lane = document.createElement('div');
-    lane.className = 'tl-lane';
+    lane.className = `tl-lane${track.kind === 'audio' ? ' audio' : ''}`;
     lane.style.width = `${width}px`;
     lane.dataset.trackId = track.id;
+    lane.dataset.kind = track.kind || 'video';
     row.appendChild(lane);
 
     let offset = 0;
@@ -121,19 +122,23 @@ export class Timeline {
     const clip = this.ws.getClip(segment.clipId);
     const sel = this.ws.selectedSegId === segment.id;
     const dur = Math.max(0, segment.outPoint - segment.inPoint);
+    const audioKind = track.kind === 'audio';
+    const muted = !!segment.muted;
 
     const block = document.createElement('div');
-    block.className = `tl-seg${sel ? ' sel' : ''}`;
+    block.className = `tl-seg${sel ? ' sel' : ''}${audioKind ? ' audio' : ''}${
+      muted ? ' muted' : ''}`;
     block.style.left = `${outOffset * pps}px`;
     block.style.width = `${Math.max(6, dur * pps)}px`;
-    if (clip?.thumb) {
+    if (clip?.thumb && !audioKind) {
       block.style.setProperty('--edge', dominantColor(clip.thumb) || '#3b82f6');
     }
 
     const name = document.createElement('span');
     name.className = 'tl-segname';
-    name.textContent = clip?.name || '?';
-    name.title = `${clip?.name || ''}\ntrim ${segment.inPoint.toFixed(2)}s – ${segment.outPoint.toFixed(2)}s`;
+    name.textContent = ((audioKind ? '♪ ' : '') + (clip?.name || '?')) + (muted ? ' 🔇' : '');
+    name.title = `${clip?.name || ''}\ntrim ${segment.inPoint.toFixed(2)}s – ${segment.outPoint.toFixed(2)}s${
+      muted ? '\nmuted' : ''}`;
 
     const readout = document.createElement('span');
     readout.className = 'tl-segdur';
@@ -159,7 +164,7 @@ export class Timeline {
       this.rebuild();
     });
 
-    if (pps >= MIN_PPS_ZOOM_FILMSTRIP && clip) {
+    if (pps >= MIN_PPS_ZOOM_FILMSTRIP && clip && !audioKind) {
       this.attachFilmstrip(block, clip, segment, pps);
     }
     return block;

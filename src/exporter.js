@@ -3,9 +3,9 @@
 import { getFFmpeg, runFFmpeg } from './ffmpeg-loader.js';
 import { buildExportJob } from './filtergraph.js';
 
-export async function exportSegments(segments, { onProgress } = {}) {
-  // segments: [{ clip: Clip, trim: {inPoint,outPoint}, probe }]
-  const job = buildExportJob(segments);
+export async function exportSegments(segments, { onProgress, kind = 'video' } = {}) {
+  // segments: [{ clip: Clip, trim: {inPoint,outPoint}, probe, muted }]
+  const job = buildExportJob(segments, { kind });
   const ffmpeg = await getFFmpeg();
 
   const started = performance.now();
@@ -16,7 +16,7 @@ export async function exportSegments(segments, { onProgress } = {}) {
     await ffmpeg.writeFile(`in${i}.mp4`, data);
   }
   try {
-    await ffmpeg.deleteFile('out.mp4');
+    await ffmpeg.deleteFile(job.out);
   } catch { /* first run */ }
 
   let stderrTail = '';
@@ -38,7 +38,7 @@ export async function exportSegments(segments, { onProgress } = {}) {
       `ffmpeg exited with code ${res.code}\n${stderrTail}`
     );
   }
-  const data = await ffmpeg.readFile('out.mp4');
+  const data = await ffmpeg.readFile(job.out);
   if (!data || !data.length) throw new Error('ffmpeg produced no output');
 
   // cleanup inputs (best effort)
@@ -46,11 +46,12 @@ export async function exportSegments(segments, { onProgress } = {}) {
     try { await ffmpeg.deleteFile(`in${i}.mp4`); } catch { /* ignore */ }
   }
 
-  const blob = new Blob([data], { type: 'video/mp4' });
+  const blob = new Blob([data], { type: job.mime });
   onProgress?.(1, performance.now() - started);
   return {
     blob,
     url: URL.createObjectURL(blob),
+    audioOnly: job.kind === 'audio',
     durationSec: total,
     bytes: blob.size,
     elapsedMs: performance.now() - started,

@@ -155,5 +155,53 @@ function seg(trimIn, trimOut, probe) {
   assert(p.fps === 30, 'fps from real stream');
 }
 
+// --- 11: every segment muted -> audio dropped entirely, no orphan chains ---
+{
+  const s = seg(0, 3);
+  s.muted = true;
+  const job = buildExportJob([s]);
+  const a = job.args;
+  assert(!a.some((v, i) => v === '-map' && a[i + 1] === '[aout]'), 'no [aout] map when muted');
+  const fc = a[a.indexOf('-filter_complex') + 1];
+  assert(!fc.includes(':a]'), 'no audio chains when all muted (would be unconnected)');
+  assert(!a.includes('anullsrc'), 'no lavfi silence input when all muted');
+  assert(fc.includes('concat=n=1:v=1:a=0[vout]'), 'video-only concat when every seg muted');
+  assert(a.includes('libx264'), 'video still exported');
+}
+
+// --- 11b: one muted among unmuted -> still a=1 concat with silence fill ---
+{
+  const j1 = seg(0, 3);
+  const j2 = seg(0, 3);
+  j2.muted = true;
+  const job = buildExportJob([j1, j2]);
+  const a = job.args;
+  assert(a.includes('anullsrc=r=44100:cl=stereo'), 'muted seg -> lavfi silence');
+  const fc = a[a.indexOf('-filter_complex') + 1];
+  assert(fc.includes('concat=n=2:v=1:a=1[vout][aout]'), 'mixed mute keeps a=1 concat');
+}
+
+// --- 12: audio-only export kind ---
+{
+  const job = buildExportJob([seg(1, 4)], { kind: 'audio' });
+  const a = job.args;
+  const fc = a[a.indexOf('-filter_complex') + 1];
+  assert(!fc.includes(':v]'), 'no video filters in audio mode');
+  assert(fc.includes('atrim=start=1:end=4'), 'audio trim present');
+  assert(fc.includes('concat=n=1:v=0:a=1[aout]'), 'audio-only concat');
+  assert(!a.some((v, i) => v === '-map' && a[i + 1] === '[vout]'), 'no [vout] map');
+  assert(!a.includes('libx264'), 'no video codec');
+  assert(job.out === 'out.m4a' && job.mime === 'audio/mp4', 'm4a output');
+}
+
+// --- 13: audio-only stint with a no-audio source still synths silence ---
+{
+  const job = buildExportJob([seg(0, 2, { hasAudio: false })], { kind: 'audio' });
+  const a = job.args;
+  assert(a.includes('anullsrc=r=44100:cl=stereo'), 'lavfi silence in audio mode');
+  const fc = a[a.indexOf('-filter_complex') + 1];
+  assert(fc.includes('concat=n=1:v=0:a=1[aout]'), 'audio concat');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

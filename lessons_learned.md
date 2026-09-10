@@ -3,6 +3,30 @@
 Living document. Add anything that cost real debugging time and isn't obvious
 from the code. Keep entries short: the bug, the tell, the fix/rule.
 
+## 2026-09-09 — wasm ffmpeg `Aborted()` freezes `exec` forever
+
+- **Bug:** after introducing diagonal filters, one graph shape made ffmpeg
+  print `Filter aformat:default has an unconnected output` then `Aborted()`.
+  The wasm core abort *kills the worker*, so `ffmpeg.exec()`'s promise never
+  resolves AND never rejects — the app/e2e hangs silently instead of
+  surfacing "exited with code 1".
+- **Cause:** when every segment's audio was muted, concat was built as
+  `v=1:a=0`, but the per-segment audio chains (`aformat…[aN]`) were still
+  emitted — unconnected filter outputs are fatal in ffmpeg.
+- **Fix:** `buildExportJob` now plans audio chains in a second pass and only
+  emits them (`needAudio`) when the concat will actually consume them, and
+  only then appends the lavfi `anullsrc` inputs.
+- **Rules:**
+  - Any filter chain whose labeled output is not consumed by a later filter
+    or `-map` aborts the graph. Emit "optional" chains only when they will be
+    wired up.
+  - A wasm `Aborted()` is not a normal exit — treat hanging exports as "look
+    for the last ffmpeg log line" (the repro harness with the `log`
+    listener). Consider a watchdog timeout in `runFFmpeg` if hangs recur.
+- **Debug:** recreating with `tests/repro-export.mjs`-style scripts
+  (seed a synthetic clip via lavfi, call `exportSegments` directly, dump
+  logs) isolates export bugs from UI/mute/drag state.
+
 ## 2026-09-08 — ffmpeg concat filter pad ordering (mjs:1 fixed post-merge)
 
 - **Bug:** ffmpeg exited with code 1 on any *stitched* export of 2+ audio-bearing

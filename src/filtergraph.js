@@ -36,8 +36,9 @@ export function validateSegments(segments) {
   });
 }
 
-export function buildExportJob(segments) {
+export function buildExportJob(segments, { kind = 'video' } = {}) {
   validateSegments(segments);
+  const audioOnly = kind === 'audio';
 
   const ref = segments[0].probe;
   const W = Number.isFinite(ref.width) && ref.width > 0 ? Math.round(ref.width) : 640;
@@ -49,6 +50,8 @@ export function buildExportJob(segments) {
   const chains = [];
   const videoLabels = [];
   const audioLabels = [];
+  const audioPlans = [];
+  const audioLens = [];
   let anyAudio = false;
   let nextInputIdx = N; // lavfi silent-audio inputs appended after file inputs
 
@@ -60,36 +63,50 @@ export function buildExportJob(segments) {
     if (len <= 0) throw new Error(`segment ${i}: empty after clamping to source`);
 
     inputArgs.push('-i', `in${i}.mp4`);
+    const wantsAudio = !!seg.probe.hasAudio && !seg.muted;
+    if (wantsAudio) anyAudio = true;
+    audioLens.push(len);
 
-    chains.push(
-      `[${i}:v]trim=start=${fmt(tin)}:end=${fmt(tout)},` +
-      `setpts=PTS-STARTPTS,` +
-      `fps=${F},` +
-      `scale=${W}:${H}:force_original_aspect_ratio=decrease,` +
-      `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,` +
-      `format=yuv420p[v${i}]`
-    );
-    videoLabels.push(`[v${i}]`);
-
-    if (seg.probe.hasAudio) {
-      anyAudio = true;
+    if (!audioOnly) {
       chains.push(
-        `[${i}:a]atrim=start=${fmt(tin)}:end=${fmt(tout)},` +
-        `asetpts=PTS-STARTPTS,` +
-        `aformat=sample_fmts=fltp:sample_rates=${SAMPLE_RATE}:channel_layouts=stereo[a${i}]`
+        `[${i}:v]trim=start=${fmt(tin)}:end=${fmt(tout)},` +
+        `setpts=PTS-STARTPTS,` +
+        `fps=${F},` +
+        `scale=${W}:${H}:force_original_aspect_ratio=decrease,` +
+        `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,` +
+        `format=yuv420p[v${i}]`
       );
-    } else {
-      // silent audio so mixed audio/no-audio sequences still concat cleanly
-      inputArgs.push('-f', 'lavfi', '-t', fmt(len + 1 / F), '-i',
-        `anullsrc=r=${SAMPLE_RATE}:cl=stereo`);
-      chains.push(
-        `[${nextInputIdx}:a]` +
-        `aformat=sample_fmts=fltp:sample_rates=${SAMPLE_RATE}:channel_layouts=stereo[a${i}]`
-      );
-      nextInputIdx++;
+      videoLabels.push(`[v${i}]`);
     }
-    audioLabels.push(`[a${i}]`);
+    audioPlans.push({ wantsAudio, tin, tout });
   });
+
+  // Only build audio chains (and lavfi silence inputs) when the concat
+  // actually consumes audio — an audio chain with an unconnected output
+  // aborts the graph.
+  const needAudio = audioOnly || anyAudio;
+  if (needAudio) {
+    audioPlans.forEach((p, i) => {
+      if (p.wantsAudio) {
+        chains.push(
+          `[${i}:a]atrim=start=${fmt(p.tin)}:end=${fmt(p.tout)},` +
+          `asetpts=PTS-STARTPTS,` +
+          `aformat=sample_fmts=fltp:sample_rates=${SAMPLE_RATE}:channel_layouts=stereo[a${i}]`
+        );
+      } else {
+        // silent audio so mixed audio/no-audio sequences still concat cleanly
+        // (also replaces a muted segment's audio with silence)
+        inputArgs.push('-f', 'lavfi', '-t', fmt(audioLens[i] + 1 / F), '-i',
+          `anullsrc=r=${SAMPLE_RATE}:cl=stereo`);
+        chains.push(
+          `[${nextInputIdx}:a]` +
+          `aformat=sample_fmts=fltp:sample_rates=${SAMPLE_RATE}:channel_layouts=stereo[a${i}]`
+        );
+        nextInputIdx++;
+      }
+      audioLabels.push(`[a${i}]`);
+    });
+  }
 
   // concat with v=1:a=1 expects per-segment pairs interleaved:
   // [v0][a0][v1][a1]… — grouping all video labels then all audio labels
@@ -97,30 +114,38 @@ export function buildExportJob(segments) {
   const pairedLabels = videoLabels.flatMap((v, i) => [v, audioLabels[i]]);
   const filterComplex = [...chains];
   filterComplex.push(
-    anyAudio
-      ? `${pairedLabels.join('')}concat=n=${N}:v=1:a=1[vout][aout]`
-      : `${videoLabels.join('')}concat=n=${N}:v=1:a=0[vout]`
+    audioOnly
+      ? `${audioLabels.join('')}concat=n=${N}:v=0:a=1[aout]`
+      : anyAudio
+        ? `${pairedLabels.join('')}concat=n=${N}:v=1:a=1[vout][aout]`
+        : `${videoLabels.join('')}concat=n=${N}:v=1:a=0[vout]`
   );
 
-  const args = [
-    '-hide_banner',
-    ...inputArgs,
-    '-filter_complex', filterComplex.join(';'),
-    '-map', '[vout]',
-  ];
-  if (anyAudio) args.push('-map', '[aout]');
-  args.push(
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '18',
-    '-pix_fmt', 'yuv420p',
-  );
-  if (anyAudio) args.push('-c:a', 'aac', '-b:a', '128k');
-  args.push('-movflags', '+faststart', 'out.mp4');
+  const args = ['-hide_banner', ...inputArgs, '-filter_complex', filterComplex.join(';')];
+  if (audioOnly) {
+    args.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '128k');
+  } else {
+    args.push('-map', '[vout]');
+    if (anyAudio) args.push('-map', '[aout]');
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '18',
+      '-pix_fmt', 'yuv420p',
+    );
+    if (anyAudio) args.push('-c:a', 'aac', '-b:a', '128k');
+  }
+  args.push('-movflags', '+faststart',
+    audioOnly ? 'out.m4a' : 'out.mp4');
 
   const totalDuration = segments.reduce((s, g) => s + segDuration(g), 0);
 
-  return { args, totalDuration, width: W, height: H, fps: F };
+  return {
+    args, totalDuration, kind,
+    width: W, height: H, fps: F,
+    out: audioOnly ? 'out.m4a' : 'out.mp4',
+    mime: audioOnly ? 'audio/mp4' : 'video/mp4',
+  };
 }
 
 // Parse `ffmpeg -i input` stderr (wasm core ships no ffprobe).

@@ -77,6 +77,18 @@ $('delSegBtn').addEventListener('click', () => {
 $('leftBtn').addEventListener('click', () => ws.selectedSegId && ws.moveSegment(ws.selectedSegId, -1));
 $('rightBtn').addEventListener('click', () => ws.selectedSegId && ws.moveSegment(ws.selectedSegId, 1));
 $('addTrackBtn').addEventListener('click', () => ws.addTrack());
+$('addAudioTrackBtn').addEventListener('click', () => ws.addTrack('audio'));
+$('muteBtn').addEventListener('click', () => {
+  if (!ws.selectedSegId) return notify('Select a segment first');
+  ws.toggleMute(ws.selectedSegId);
+});
+ws.addEventListener('change', updateMuteBtn);
+function updateMuteBtn() {
+  const seg = ws.seg(ws.selectedSegId)?.segment;
+  const muted = !!seg?.muted;
+  $('muteBtn').classList.toggle('active', muted);
+  $('muteBtn').textContent = muted ? '🔇 Muted' : '🔊 Mute';
+}
 
 // ---------- export ----------
 let exporting = false;
@@ -123,24 +135,28 @@ $('exportBtn').addEventListener('click', async () => {
 
   try {
     await getFFmpeg(setEngineStatus);
+    const kind = track.kind === 'audio' ? 'audio' : 'video';
     const segs = track.segments.map((s) => ({
       clip: ws.getClip(s.clipId),
       trim: { inPoint: s.inPoint, outPoint: s.outPoint },
       probe: ws.getClip(s.clipId)?.probe,
+      muted: !!s.muted,
     })).filter((s) => s.clip && s.probe?.duration > 0);
 
     if (!segs.length) throw new Error('track has no probed segments yet');
 
     const result = await exportSegments(segs, {
       onProgress: (pct, elapsedMs) => showProgress(pct, elapsedMs),
+      kind,
     });
 
     // auto-download + preview the real result
     const a = document.createElement('a');
     a.href = result.url;
-    a.download = `${(segs.length > 1 ? 'stitched' : 'trimmed')}-${Date.now()}.mp4`;
+    a.download = `${(segs.length > 1 ? 'stitched' : 'trimmed')}-${Date.now()}${
+      kind === 'audio' ? '.m4a' : '.mp4'}`;
     a.click();
-    swapPreview(result.url);
+    if (!result.audioOnly) swapPreview(result.url);
     notify(`Exported ${(result.bytes / 1048576).toFixed(2)} MB in ${(result.elapsedMs / 1000).toFixed(1)}s`);
   } catch (err) {
     console.error(err);
@@ -225,6 +241,9 @@ window.addEventListener('keydown', (e) => {
     case 'End': player.seekToSource(player.range.out); break;
     case 'i': case 'I': player.setIn(); break;
     case 'o': case 'O': player.setOut(); break;
+    case 'm': case 'M':
+      if (sel) ws.toggleMute(sel.segment.id);
+      break;
     case 's': case 'S':
       if (sel) ws.splitSegment(sel.segment.id, player.video.currentTime);
       break;
@@ -237,6 +256,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---------- boot ----------
+updateMuteBtn();
 setEngineStatus(isFFmpegLoaded() ? 'ready' : '');
 
 // test hook (harmless in production)
