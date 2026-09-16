@@ -5,8 +5,8 @@ from the code. Keep entries short: the bug, the tell, the fix/rule.
 
 ## 2026-09-09 — wasm ffmpeg `Aborted()` freezes `exec` forever
 
-- **Bug:** after introducing diagonal filters, one graph shape made ffmpeg
-  print `Filter aformat:default has an unconnected output` then `Aborted()`.
+- **Bug:** while adding mute support, one graph shape made ffmpeg print
+  `Filter aformat:default has an unconnected output` then `Aborted()`.
   The wasm core abort *kills the worker*, so `ffmpeg.exec()`'s promise never
   resolves AND never rejects — the app/e2e hangs silently instead of
   surfacing "exited with code 1".
@@ -27,7 +27,7 @@ from the code. Keep entries short: the bug, the tell, the fix/rule.
   (seed a synthetic clip via lavfi, call `exportSegments` directly, dump
   logs) isolates export bugs from UI/mute/drag state.
 
-## 2026-09-08 — ffmpeg concat filter pad ordering (mjs:1 fixed post-merge)
+## 2026-09-08 — ffmpeg concat filter pad ordering
 
 - **Bug:** ffmpeg exited with code 1 on any *stitched* export of 2+ audio-bearing
   clips while single-trim exports worked fine. stderr said
