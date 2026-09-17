@@ -207,7 +207,7 @@ export class Workspace extends EventTarget {
   }
 
   setPps(pps) {
-    this.pps = Math.max(4, Math.min(600, pps));
+    this.pps = Math.max(0.05, Math.min(600, pps));
     this.emit('zoom');
     this.emit();
   }

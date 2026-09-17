@@ -449,7 +449,7 @@ export class Timeline {
 }
 
 function pickStep(pps) {
-  for (const s of [0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60]) {
+  for (const s of [0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 300, 600, 1800]) {
     if (s * pps >= 64) return s;
   }
   return 60;
